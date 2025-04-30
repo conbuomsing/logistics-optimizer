@@ -87,12 +87,33 @@ with tab1:
         col3.metric("Thể tích yêu cầu", f"{cargo_volume:.1f} m³")
         
         # Biểu đồ phân bổ
-        fig = go.Figure(data=[
-            go.Bar(name='Số lượng', x=df_results['Phương tiện'], y=df_results['Số lượng']),
-            go.Bar(name='Chi phí (triệu VNĐ)', x=df_results['Phương tiện'], y=df_results['Chi phí']/1000000)
-        ])
-        fig.update_layout(barmode='group', title='Phân bổ phương tiện và chi phí')
-        st.plotly_chart(fig)
+fig = go.Figure(data=[
+    go.Bar(name='Số lượng', 
+           x=df_results['Phương tiện'], 
+           y=df_results['Số lượng'],
+           marker_color='rgb(0, 102, 204)'),
+    go.Bar(name='Chi phí (triệu VNĐ)', 
+           x=df_results['Phương tiện'], 
+           y=df_results['Chi phí']/1000000,  # Chuyển đổi sang đơn vị triệu
+           marker_color='rgb(135, 206, 250)')
+])
+
+# Cập nhật layout
+fig.update_layout(
+    barmode='group',
+    title='Phân bổ phương tiện và chi phí',
+    yaxis_title='Số lượng / Chi phí (triệu VNĐ)',
+    showlegend=True,
+    legend=dict(
+        orientation="h",
+        yanchor="bottom",
+        y=1.02,
+        xanchor="right",
+        x=1
+    )
+)
+
+st.plotly_chart(fig)
 
 # Tab 2: Phân tích độ nhạy
 with tab2:
