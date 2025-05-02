@@ -212,114 +212,73 @@ with tab2:
         
     except Exception as e:
         st.error(f"Có lỗi xảy ra trong phân tích độ nhạy: {str(e)}")
-
+        
 # Tab 3: Dự báo nhu cầu
 with tab3:
-    st.subheader("Dự báo nhu cầu vận chuyển")
+    st.subheader("Dự báo nhu cầu vận chuyển 2025")
     
     try:
-        # Tùy chọn cho dự báo
+        # Dữ liệu thực tế
+        real_data = {
+            'Ngày': ['2025-01-02', '2025-01-15', '2025-01-22', '2025-02-26', '2025-03-26'],
+            'Thể tích': [8, 13, 17, 23, 18],
+            'Tuyến đường': ['Hải Phòng', 'Nội Bài', 'Hải Phòng', 'Nội Bài', 'Nội Bài']
+        }
+        
+        df_real = pd.DataFrame(real_data)
+        df_real['Ngày'] = pd.to_datetime(df_real['Ngày'])
+        
+        # Tạo dự báo cho phần còn lại của năm 2025
         forecast_col1, forecast_col2 = st.columns(2)
         
         with forecast_col1:
-            start_date = st.date_input(
-                "Ngày bắt đầu",
-                datetime.now() - timedelta(days=30)
-            )
-            forecast_days = st.number_input("Số ngày dự báo", min_value=7, max_value=90, value=30)
-            
+            growth_rate = st.number_input("Tốc độ tăng trưởng hàng tháng (%)", 
+                                        min_value=-20.0, max_value=20.0, value=2.0)
+        
         with forecast_col2:
             seasonality = st.selectbox(
                 "Mô hình theo mùa",
-                ["Không có", "Theo tuần", "Theo tháng"]
+                ["Không có", "Theo quý", "Theo tháng"]
             )
-            base_volume = st.number_input("Thể tích trung bình/ngày (m³)", min_value=1.0, value=100.0)
 
-        # Tạo dữ liệu lịch sử giả lập với tính mùa vụ
-        dates = pd.date_range(start=start_date, periods=30, freq='D')
+        # Tạo dữ liệu dự báo
+        future_dates = pd.date_range(start='2025-04-01', end='2025-12-31', freq='M')
+        base_volume = df_real['Thể tích'].mean()
         
-        # Tạo dữ liệu cơ bản
-        base_volumes = np.random.normal(base_volume, base_volume*0.1, len(dates))
-        
-        # Thêm yếu tố mùa vụ
-        if seasonality == "Theo tuần":
-            # Tăng vào đầu tuần, giảm vào cuối tuần
-            weekly_pattern = np.array([1.2, 1.1, 1.0, 0.9, 0.8, 0.7, 0.7])
-            seasonal_effect = np.tile(weekly_pattern, len(dates)//7 + 1)[:len(dates)]
-            volumes = base_volumes * seasonal_effect
-        elif seasonality == "Theo tháng":
-            # Tăng vào đầu tháng, giảm vào cuối tháng
-            day_of_month = dates.day
-            monthly_effect = 1.2 - (day_of_month - 1) * 0.02
-            volumes = base_volumes * monthly_effect
-        else:
-            volumes = base_volumes
+        forecast_volumes = []
+        for i, date in enumerate(future_dates):
+            # Tính toán tăng trưởng cơ bản
+            month_growth = (1 + growth_rate/100) ** (i + 1)
+            volume = base_volume * month_growth
+            
+            # Thêm yếu tố mùa vụ
+            if seasonality == "Theo quý":
+                quarter = (date.month - 1) // 3
+                seasonal_factors = [1.1, 0.9, 1.2, 1.0]  # Q1, Q2, Q3, Q4
+                volume *= seasonal_factors[quarter]
+            elif seasonality == "Theo tháng":
+                monthly_factors = [1.1, 1.0, 1.2, 0.9, 0.8, 1.0, 1.3, 1.2, 1.1, 1.0, 0.9, 1.1]
+                volume *= monthly_factors[date.month - 1]
+            
+            forecast_volumes.append(volume)
 
-        # Tạo DataFrame lịch sử
-        df_history = pd.DataFrame({
-            'Ngày': dates,
-            'Thể tích': volumes
-        })
-
-        # Tính toán dự báo
-        # 1. Moving Average (7 ngày)
-        df_history['MA7'] = df_history['Thể tích'].rolling(window=7, center=True).mean()
-        
-        # 2. Exponential Smoothing
-        alpha = 0.2  # Hệ số làm mượt
-        df_history['EMA'] = df_history['Thể tích'].ewm(alpha=alpha, adjust=False).mean()
-        
-        # 3. Linear Trend
-        X = np.arange(len(df_history)).reshape(-1, 1)
-        y = df_history['Thể tích'].values
-        model = LinearRegression()
-        model.fit(X, y)
-        df_history['Trend'] = model.predict(X)
-        
-        # Tạo dự báo cho tương lai
-        future_dates = pd.date_range(
-            start=dates[-1] + timedelta(days=1), 
-            periods=forecast_days, 
-            freq='D'
-        )
-        
-        future_X = np.arange(len(df_history), len(df_history) + len(future_dates)).reshape(-1, 1)
-        future_trend = model.predict(future_X)
-        
         # Tạo DataFrame dự báo
         df_forecast = pd.DataFrame({
             'Ngày': future_dates,
-            'Dự báo': future_trend
+            'Dự báo': forecast_volumes
         })
         
         # Vẽ biểu đồ
         fig = go.Figure()
         
-        # Dữ liệu lịch sử
+        # Dữ liệu thực tế
         fig.add_trace(go.Scatter(
-            x=df_history['Ngày'],
-            y=df_history['Thể tích'],
+            x=df_real['Ngày'],
+            y=df_real['Thể tích'],
             mode='markers+lines',
             name='Dữ liệu thực tế',
-            line=dict(color='rgb(0, 102, 204)')
-        ))
-        
-        # Moving Average
-        fig.add_trace(go.Scatter(
-            x=df_history['Ngày'],
-            y=df_history['MA7'],
-            mode='lines',
-            name='Moving Average (7 ngày)',
-            line=dict(color='rgb(255, 102, 102)')
-        ))
-        
-        # Exponential Smoothing
-        fig.add_trace(go.Scatter(
-            x=df_history['Ngày'],
-            y=df_history['EMA'],
-            mode='lines',
-            name='Exp. Smoothing',
-            line=dict(color='rgb(51, 204, 51)')
+            line=dict(color='rgb(0, 102, 204)'),
+            marker=dict(size=8)
         ))
         
         # Dự báo
@@ -328,12 +287,12 @@ with tab3:
             y=df_forecast['Dự báo'],
             mode='lines',
             name='Dự báo',
-            line=dict(color='rgb(255, 153, 51)', dash='dash')
+            line=dict(color='rgb(255, 102, 102)', dash='dash')
         ))
         
         fig.update_layout(
-            title='Dự báo nhu cầu vận chuyển',
-            xaxis_title='Ngày',
+            title='Dự báo nhu cầu vận chuyển 2025',
+            xaxis_title='Thời gian',
             yaxis_title='Thể tích (m³)',
             hovermode='x unified',
             showlegend=True
@@ -342,37 +301,44 @@ with tab3:
         st.plotly_chart(fig)
         
         # Hiển thị thống kê
-        st.subheader("Thống kê dự báo")
+        st.subheader("Thống kê")
         
         stats_col1, stats_col2, stats_col3 = st.columns(3)
         
         with stats_col1:
             st.metric(
-                "Thể tích trung bình",
-                f"{df_history['Thể tích'].mean():.1f} m³",
-                f"{df_history['Thể tích'].std():.1f} m³"
+                "Thể tích trung bình (Thực tế)",
+                f"{df_real['Thể tích'].mean():.1f} m³",
+                f"±{df_real['Thể tích'].std():.1f} m³"
             )
             
         with stats_col2:
             st.metric(
-                "Dự báo trung bình",
+                "Thể tích trung bình (Dự báo)",
                 f"{df_forecast['Dự báo'].mean():.1f} m³",
-                f"{df_forecast['Dự báo'].std():.1f} m³"
+                f"±{df_forecast['Dự báo'].std():.1f} m³"
             )
             
         with stats_col3:
-            trend_change = (df_forecast['Dự báo'].iloc[-1] - df_forecast['Dự báo'].iloc[0]) / df_forecast['Dự báo'].iloc[0] * 100
+            growth = (df_forecast['Dự báo'].iloc[-1] - df_real['Thể tích'].mean()) / df_real['Thể tích'].mean() * 100
             st.metric(
-                "Xu hướng",
-                f"{trend_change:+.1f}%",
-                "Tăng" if trend_change > 0 else "Giảm"
+                "Tăng trưởng dự kiến",
+                f"{growth:+.1f}%",
+                "Tăng" if growth > 0 else "Giảm"
             )
         
-        # Hiển thị bảng dự báo
-        st.subheader("Bảng dự báo chi tiết")
-        df_forecast_display = df_forecast.copy()
-        df_forecast_display['Dự báo'] = df_forecast_display['Dự báo'].round(1)
-        st.dataframe(df_forecast_display)
+        # Hiển thị bảng dữ liệu
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.subheader("Dữ liệu thực tế")
+            st.dataframe(df_real)
+            
+        with col2:
+            st.subheader("Dự báo các tháng còn lại")
+            df_forecast_display = df_forecast.copy()
+            df_forecast_display['Dự báo'] = df_forecast_display['Dự báo'].round(1)
+            st.dataframe(df_forecast_display)
         
     except Exception as e:
         st.error(f"Có lỗi xảy ra trong dự báo: {str(e)}")
