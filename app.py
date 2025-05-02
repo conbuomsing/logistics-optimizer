@@ -215,51 +215,76 @@ with tab2:
         
 # Tab 3: Dự báo nhu cầu
 with tab3:
-    st.subheader("Dự báo nhu cầu vận chuyển 2025")
+    st.subheader("Dự báo nhu cầu vận chuyển 2026")
     
     try:
-        # Dữ liệu thực tế
+        # Dữ liệu thực tế 2025
         real_data = {
-            'Ngày': ['2025-01-02', '2025-01-15', '2025-01-22', '2025-02-26', '2025-03-26'],
-            'Thể tích': [8, 13, 17, 23, 18],
-            'Tuyến đường': ['Hải Phòng', 'Nội Bài', 'Hải Phòng', 'Nội Bài', 'Nội Bài']
+            'Ngày': ['2025-01-02', '2025-01-15', '2025-01-22', '2025-02-26', '2025-03-26',
+                     '2025-06-25', '2025-07-16', '2025-07-30', '2025-08-06', '2025-08-13',
+                     '2025-09-03', '2025-09-17', '2025-09-24', '2025-10-01'],
+            'Thể tích': [8, 13, 17, 23, 18, 26, 23, 20, 18, 14, 13, 16, 6, 27],
+            'Tuyến đường': ['Hải Phòng', 'Nội Bài', 'Hải Phòng', 'Nội Bài', 'Nội Bài',
+                           'Hải Phòng', 'Hải Phòng', 'Hải Phòng', 'Hải Phòng', 'Hải Phòng',
+                           'Hải Phòng', 'Hải Phòng', 'Hải Phòng', 'Hải Phòng']
         }
         
         df_real = pd.DataFrame(real_data)
         df_real['Ngày'] = pd.to_datetime(df_real['Ngày'])
         
-        # Tạo dự báo cho phần còn lại của năm 2025
+        # Phân tích dữ liệu theo quý
+        df_real['Quý'] = df_real['Ngày'].dt.quarter
+        quarterly_avg = df_real.groupby('Quý')['Thể tích'].mean()
+        
+        # Hiển thị thống kê 2025
+        st.subheader("Phân tích dữ liệu 2025")
+        stats_col1, stats_col2, stats_col3, stats_col4 = st.columns(4)
+        
+        with stats_col1:
+            st.metric("Q1-2025", f"{quarterly_avg[1]:.1f} m³")
+        with stats_col2:
+            st.metric("Q2-2025", f"{quarterly_avg[2]:.1f} m³")
+        with stats_col3:
+            st.metric("Q3-2025", f"{quarterly_avg[3]:.1f} m³")
+        with stats_col4:
+            st.metric("Q4-2025", f"{quarterly_avg[4]:.1f} m³")
+
+        # Tùy chọn dự báo
         forecast_col1, forecast_col2 = st.columns(2)
         
         with forecast_col1:
-            growth_rate = st.number_input("Tốc độ tăng trưởng hàng tháng (%)", 
-                                        min_value=-20.0, max_value=20.0, value=2.0)
-        
+            growth_rate = st.number_input("Tốc độ tăng trưởng năm 2026 (%)", 
+                                        min_value=-20.0, max_value=20.0, value=5.0)
+            
         with forecast_col2:
             seasonality = st.selectbox(
                 "Mô hình theo mùa",
-                ["Không có", "Theo quý", "Theo tháng"]
+                ["Theo quý 2025", "Điều chỉnh theo mùa"]
             )
 
-        # Tạo dữ liệu dự báo
-        future_dates = pd.date_range(start='2025-04-01', end='2025-12-31', freq='M')
+        # Tạo dữ liệu dự báo 2026
+        future_dates = pd.date_range(start='2026-01-01', end='2026-12-31', freq='M')
         base_volume = df_real['Thể tích'].mean()
         
         forecast_volumes = []
-        for i, date in enumerate(future_dates):
-            # Tính toán tăng trưởng cơ bản
-            month_growth = (1 + growth_rate/100) ** (i + 1)
-            volume = base_volume * month_growth
+        for date in future_dates:
+            quarter = (date.month - 1) // 3 + 1
             
-            # Thêm yếu tố mùa vụ
-            if seasonality == "Theo quý":
-                quarter = (date.month - 1) // 3
-                seasonal_factors = [1.1, 0.9, 1.2, 1.0]  # Q1, Q2, Q3, Q4
-                volume *= seasonal_factors[quarter]
-            elif seasonality == "Theo tháng":
-                monthly_factors = [1.1, 1.0, 1.2, 0.9, 0.8, 1.0, 1.3, 1.2, 1.1, 1.0, 0.9, 1.1]
-                volume *= monthly_factors[date.month - 1]
+            if seasonality == "Theo quý 2025":
+                # Sử dụng mô hình theo quý của 2025
+                base = quarterly_avg[quarter]
+            else:
+                # Điều chỉnh theo mùa
+                seasonal_factors = {
+                    1: 1.1,  # Q1: Tăng do đầu năm
+                    2: 0.9,  # Q2: Giảm nhẹ
+                    3: 0.8,  # Q3: Thấp điểm
+                    4: 1.2   # Q4: Cao điểm cuối năm
+                }
+                base = base_volume * seasonal_factors[quarter]
             
+            # Áp dụng tăng trưởng
+            volume = base * (1 + growth_rate/100)
             forecast_volumes.append(volume)
 
         # Tạo DataFrame dự báo
@@ -271,27 +296,27 @@ with tab3:
         # Vẽ biểu đồ
         fig = go.Figure()
         
-        # Dữ liệu thực tế
+        # Dữ liệu thực tế 2025
         fig.add_trace(go.Scatter(
             x=df_real['Ngày'],
             y=df_real['Thể tích'],
             mode='markers+lines',
-            name='Dữ liệu thực tế',
+            name='Thực tế 2025',
             line=dict(color='rgb(0, 102, 204)'),
             marker=dict(size=8)
         ))
         
-        # Dự báo
+        # Dự báo 2026
         fig.add_trace(go.Scatter(
             x=df_forecast['Ngày'],
             y=df_forecast['Dự báo'],
             mode='lines',
-            name='Dự báo',
+            name='Dự báo 2026',
             line=dict(color='rgb(255, 102, 102)', dash='dash')
         ))
         
         fig.update_layout(
-            title='Dự báo nhu cầu vận chuyển 2025',
+            title='So sánh dữ liệu thực tế 2025 và dự báo 2026',
             xaxis_title='Thời gian',
             yaxis_title='Thể tích (m³)',
             hovermode='x unified',
@@ -300,27 +325,27 @@ with tab3:
         
         st.plotly_chart(fig)
         
-        # Hiển thị thống kê
-        st.subheader("Thống kê")
+        # Hiển thị thống kê so sánh
+        st.subheader("So sánh 2025-2026")
         
-        stats_col1, stats_col2, stats_col3 = st.columns(3)
+        compare_col1, compare_col2, compare_col3 = st.columns(3)
         
-        with stats_col1:
+        with compare_col1:
             st.metric(
-                "Thể tích trung bình (Thực tế)",
+                "Trung bình 2025",
                 f"{df_real['Thể tích'].mean():.1f} m³",
                 f"±{df_real['Thể tích'].std():.1f} m³"
             )
             
-        with stats_col2:
+        with compare_col2:
             st.metric(
-                "Thể tích trung bình (Dự báo)",
+                "Dự báo trung bình 2026",
                 f"{df_forecast['Dự báo'].mean():.1f} m³",
-                f"±{df_forecast['Dự báo'].std():.1f} m³"
+                f"{df_forecast['Dự báo'].mean() - df_real['Thể tích'].mean():.1f} m³"
             )
             
-        with stats_col3:
-            growth = (df_forecast['Dự báo'].iloc[-1] - df_real['Thể tích'].mean()) / df_real['Thể tích'].mean() * 100
+        with compare_col3:
+            growth = (df_forecast['Dự báo'].mean() - df_real['Thể tích'].mean()) / df_real['Thể tích'].mean() * 100
             st.metric(
                 "Tăng trưởng dự kiến",
                 f"{growth:+.1f}%",
@@ -331,11 +356,11 @@ with tab3:
         col1, col2 = st.columns(2)
         
         with col1:
-            st.subheader("Dữ liệu thực tế")
-            st.dataframe(df_real)
+            st.subheader("Dữ liệu thực tế 2025")
+            st.dataframe(df_real[['Ngày', 'Thể tích', 'Tuyến đường']])
             
         with col2:
-            st.subheader("Dự báo các tháng còn lại")
+            st.subheader("Dự báo 2026")
             df_forecast_display = df_forecast.copy()
             df_forecast_display['Dự báo'] = df_forecast_display['Dự báo'].round(1)
             st.dataframe(df_forecast_display)
