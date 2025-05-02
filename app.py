@@ -122,6 +122,7 @@ with tab1:
                 
         except Exception as e:
             st.error(f"Có lỗi xảy ra: {str(e)}")
+
 # Tab 2: Phân tích độ nhạy
 with tab2:
     st.subheader("Phân tích độ nhạy")
