@@ -10,7 +10,7 @@ from sklearn.linear_model import LinearRegression
 
 st.set_page_config(page_title="Tối ưu Logistics", layout="wide")
 
-st.title("Ứng dụng Tối ưu hoá chi phí Logistics doanh nghiệp Dệt May")
+st.title("Logistics Cost Optimizer")
 
 # Tabs cho các chức năng khác nhau
 tab1, tab2, tab3, tab4 = st.tabs(["Tối ưu hóa", "Phân tích độ nhạy", "Dự báo nhu cầu", "Quản lý dữ liệu"])
