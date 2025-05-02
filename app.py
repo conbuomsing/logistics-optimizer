@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 
 st.set_page_config(page_title="Tối ưu Logistics", layout="wide")
 
-st.title("Ứng dụng Tối ưu Logistics Dệt May")
+st.title("Logistics cost optimizer")
 
 # Tabs cho các chức năng khác nhau
 tab1, tab2, tab3, tab4 = st.tabs(["Tối ưu hóa", "Phân tích độ nhạy", "Dự báo nhu cầu", "Quản lý dữ liệu"])
